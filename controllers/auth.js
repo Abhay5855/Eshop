@@ -46,7 +46,7 @@ exports.login = (req, res) => {
     var token = jwt.sign({ _id: user._id }, "shhhhh");
 
     // send token in the cookie
-    res.cookie("access_token", token, { expire: new Date() + 9999 });
+    res.cookie("token", token, { expire: new Date() + 9999 });
 
     //send response to the frontend
     const { _id, name, email, role } = user;
