@@ -29,6 +29,7 @@ mongoose
 app.use(cookieParser());
 app.use(bodyParser.json());
 app.use(cors());
+app.use(bodyParser.urlencoded({ extended: true }));
 
 // Routing
 app.use("/api", authRoutes);

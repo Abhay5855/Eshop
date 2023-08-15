@@ -1,4 +1,5 @@
 const User = require("../models/user");
+const Token = require("../models/token");
 const { validationResult } = require("express-validator");
 const expressJwt = require("express-jwt");
 const jwt = require("jsonwebtoken");
@@ -58,6 +59,7 @@ exports.login = (req, res) => {
     return res.json({
       token,
       user: { _id, email, name, role },
+      userId: user._id,
     });
   });
 
@@ -68,7 +70,7 @@ exports.login = (req, res) => {
 };
 
 // Signout route
-exports.signout = (req, res) => {
+exports.signout = async (req, res) => {
   // Clear the cookie
   res.clearCookie("token");
 
@@ -77,74 +79,101 @@ exports.signout = (req, res) => {
   });
 };
 
-// Request reset password
-exports.requestResetPassword = (req, res) => {
+exports.requestResetPassword = async (req, res) => {
+  const { email } = req.body;
 
-  const user =  User.findOne({ email });
+  try {
+    const user = await User.findOne({ email });
 
-  if (!user) throw new Error("User does not exist");
-  let token =  Token.findOne({ userId: user._id });
-  if (token)  token.deleteOne();
-  let resetToken = crypto.randomBytes(32).toString("hex");
-  const hash =  bcrypt.hash(resetToken, Number(bcryptSalt));
+    if (!user) {
+      return res.status(400).json({
+        message: "Email does not exist",
+      });
+    }
 
-    new Token({
-    userId: user._id,
-    token: hash,
-    createdAt: Date.now(),
-  }).save();
+    // Delete any existing token for the user
+    await Token.deleteMany({ userId: user._id });
 
-  const link = `${clientURL}/passwordReset?token=${resetToken}&id=${user._id}`;
-  sendEmail(user.email,"Password Reset Request",{name: user.name,link: link,},"./template/requestResetPassword.handlebars");
-  return link;
-  // const { email} = req.body;
+    // Reset a new token
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    const hash = await bcrypt.hash(resetToken, Number(bcryptSalt));
 
+    // Save the token in the Token collection
+    const newToken = new Token({ userId: user._id, token: hash });
+    await newToken.save();
 
-  // User.findOne({ email }, (err, user) => {
+    // Generate the reset link
+    const link = `${BASE_URL}/passwordReset?token=${resetToken}&id=${user._id}`;
 
-     
-  //   if (err || !user) {
-  //     return res.status(400).json({
-  //       message: "Email does not exist",
-  //     });
-  //   }
-  //   // Get the token first
-  //   let token = User.findOne({ userId: user._id });
+    // Send the email
+    sendEmail(
+      user.email,
+      "Password Reset Request",
+      { name: user.name, link: link },
+      "./template/requestResetPassword.handlebars"
+    );
 
-  //   // If token is there delete the token
-  //   if (token) {
-  //     token.deleteOne();
-  //   }
-
-  //   // Reset a new token
-  //   let resetToken = crypto.randomBytes(32).toString("hex");
-  //   const hash = bcrypt.hash(resetToken, Number(bcryptSalt));
-
-  //   user.save((err, user) => {
-  //     if (err) {
-  //       return res.status(400).json({
-  //         message: "Failed to send the email",
-  //       });
-  //     }
-
-  //     res.json({
-  //       userId: user._id,
-  //       token: hash,
-  //       createdAt: Date.now(),
-  //     });
-  //   });
-
-  //   // generate a link to be sent to the mail -
-  //   let link = `${BASE_URL}/passwordReset?token=${resetToken}&id=${user._id}`;
-  //   sendEmail(
-  //     user.email,
-  //     "Password Reset Request",
-  //     { name: user.name, link: link },
-  //     "./template/requestResetPassword.handlebars"
-  //   );
-  //   return link;
-  // });
+    res.json({
+      link: link,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      message: "Internal server error",
+    });
+  }
 };
+
+
+// Request reset password
+// exports.requestResetPassword = async(req, res) => {
+//   const { email } = req.body;
+
+//   User.findOne({ email }, (err, user) => {
+//     if (err || !user) {
+//       return res.status(400).json({
+//         message: "Email does not exist",
+//       });
+//     }
+//     // Get the token first
+//     let token = Token.findOne({ userId: user._id });
+
+//     // If token is there delete the token
+//     if (token) {
+//       token.deleteOne();
+//     }
+
+//     // Reset a new token
+//     let resetToken = crypto.randomBytes(32).toString("hex");
+//     const hash = bcrypt.hash(resetToken, Number(bcryptSalt));
+
+//     const newUser = new Token(req.body);
+
+//     newUser.save((err, user) => {
+//       if (err) {
+//         return res.status(400).json({
+//           message: "Failed to send the email",
+//         });
+//       }
+
+//       res.json({
+//         userId: user._id,
+//         token: hash,
+//         createdAt: Date.now(),
+//       });
+//     });
+
+//     // generate a link to be sent to the mail -
+//     let link = `${BASE_URL}/passwordReset?token=${resetToken}&id=${user._id}`;
+//     sendEmail(
+//       user.email,
+//       "Password Reset Request",
+//       { name: user.name, link: link },
+//       "./template/requestResetPassword.handlebars"
+//     );
+//     return link;
+//   });
+// };
 
 // Reset password
 exports.resetPassword = (req, res) => {
