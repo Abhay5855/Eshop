@@ -6,6 +6,8 @@ const {
   signout,
   isSignedin,
   isAuthenticated,
+  requestResetPassword,
+  resetPassword
 } = require("../controllers/auth");
 const { body } = require("express-validator");
 
@@ -47,6 +49,14 @@ router.post(
 
 // Signout
 router.post("/signout", signout);
+
+
+//request password reset
+router.post("/request-reset-password",isSignedin, requestResetPassword);
+
+// Reset password
+router.post("/reset-password" , isSignedin, resetPassword);
+
 
 // Proteted
 router.post("/testroute", isSignedin, (req, res) => {

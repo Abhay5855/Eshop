@@ -44,7 +44,7 @@ app.use("/api" , productRoutes);
 
 
 // Port
-const port = 8000;
+const port = process.env.PORT;
 
 // Starting a server
 app.listen(port, () => {
